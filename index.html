@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>汐辞陪玩抽奖转盘</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui, sans-serif;}
+body{background:#17182b;color:#fff;padding:16px;min-height:100vh;}
+.container{max-width:420px;margin:0 auto;}
+.title{text-align:center;font-size:22px;margin-bottom:16px;font-weight:bold;}
+.wheel-wrap{position:relative;width:min(360px,90vw);height:min(360px,90vw);margin:0 auto 20px;}
+#wheel{width:100%;height:100%;border-radius:50%;transition:all 4s cubic-bezier(0.2,0,0.2,1);}
+.pointer{position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:32px solid #ffffff;z-index:2;}
+.input-box{text-align:center;margin-bottom:14px;}
+#nickname{width:85%;padding:12px;border-radius:10px;border:none;font-size:16px;}
+.btn-box{text-align:center;margin-bottom:24px;}
+button{padding:12px 24px;border:0;border-radius:10px;font-size:17px;margin:0 6px;cursor:pointer;}
+#spinBtn{background:#6366f1;color:#fff;}
+.log-area{background:#242642;padding:16px;border-radius:12px;max-height:320px;overflow-y:auto;}
+.log-title{font-size:18px;margin-bottom:12px;}
+.log-item{padding:8px 0;border-bottom:1px solid #404366;font-size:14px;}
+.log-btn{margin-top:10px;background:#ef4444;color:#fff;font-size:14px;padding:8px 14px;}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="title">汐辞陪玩 抽奖转盘</div>
+  <div class="wheel-wrap">
+    <div class="pointer"></div>
+    <canvas id="wheel"></canvas>
+  </div>
+  <div class="input-box">
+    <input id="nickname" placeholder="输入游戏昵称" />
+  </div>
+  <div class="btn-box">
+    <button id="spinBtn">开始抽奖</button>
+  </div>
+  <div class="log-area">
+    <div class="log-title">📋 抽取记录（店主查看）</div>
+    <div id="logList"></div>
+    <button class="log-btn" onclick="copyLog()">复制全部记录</button>
+    <button class="log-btn" onclick="clearLog()">清空记录</button>
+  </div>
+</div>
+
+<script>
+// =====12格奖品，在这里修改=====
+const prizeList = [
+  "免费护航1局",
+  "8折接单券",
+  "陪玩加时30分钟",
+  "小礼品",
+  "7折券",
+  "谢谢参与",
+  "免费单1小时",
+  "9折券",
+  "优先派单",
+  "陪玩减30元",
+  "再来一次",
+  "谢谢参与"
+];
+const colors = ["#4285F4","#EA4335","#FBBC05","#34A853","#7c4dff","#ff6090","#4285F4","#EA4335","#FBBC05","#34A853","#7c4dff","#ff6090"];
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+//自适应画布尺寸
+function resizeCanvas(){
+  const size = Math.min(360, window.innerWidth * 0.9);
+  canvas.width = size;
+  canvas.height = size;
+  drawWheel();
+}
+const sliceAngle = 360 / prizeList.length;
+let isSpinning = false;
+let rotateDeg = 0;
+
+//绘制转盘
+function drawWheel(){
+  const w = canvas.width;
+  const r = w / 2;
+  ctx.clearRect(0,0,w,w);
+  for(let i=0;i<12;i++){
+    ctx.beginPath();
+    ctx.moveTo(r,r);
+    ctx.arc(r,r,r, (i*sliceAngle-90)*Math.PI/180, ((i+1)*sliceAngle-90)*Math.PI/180);
+    ctx.fillStyle = colors[i];
+    ctx.fill();
+    ctx.strokeStyle="#fff";
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(r,r);
+    ctx.rotate( ((i+0.5)*sliceAngle -90)*Math.PI/180 );
+    ctx.fillStyle="#fff";
+    ctx.font="bold 13px sans-serif";
+    ctx.textAlign="center";
+    ctx.fillText(prizeList[i], r*0.7, 0);
+    ctx.restore();
+  }
+}
+resizeCanvas();
+window.addEventListener('resize',resizeCanvas);
+
+//旋转逻辑
+const spinBtn = document.getElementById("spinBtn");
+spinBtn.onclick = function(){
+  const userName = document.getElementById("nickname").value.trim();
+  if(!userName){alert("请输入昵称！");return;}
+  if(isSpinning) return;
+  isSpinning = true;
+  spinBtn.disabled = true;
+  const randomIndex = Math.floor(Math.random()*12);
+  const targetRotate = rotateDeg + 360*6 + (randomIndex * sliceAngle);
+  rotateDeg = targetRotate;
+  canvas.style.transform = `rotate(${rotateDeg}deg)`;
+
+  setTimeout(()=>{
+    isSpinning = false;
+    spinBtn.disabled = false;
+    const res = prizeList[randomIndex];
+    alert(`🎉恭喜【${userName}】抽到：${res}`);
+    addLog(userName,res);
+  },4000)
+}
+
+//本地存储记录
+function getLogs(){
+  const raw = localStorage.getItem("wheelLog");
+  return raw ? JSON.parse(raw) : [];
+}
+function saveLog(logs){
+  localStorage.setItem("wheelLog",JSON.stringify(logs));
+}
+function addLog(name,prize){
+  const now = new Date();
+  const time = `${now.getMonth()+1}-${now.getDate()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+  const logs = getLogs();
+  logs.unshift({name,prize,time});
+  saveLog(logs);
+  renderLog();
+}
+function renderLog(){
+  const logs = getLogs();
+  const dom = document.getElementById("logList");
+  dom.innerHTML = logs.map(item=>`
+  <div class="log-item">
+    <div>玩家：${item.name}</div>
+    <div>奖项：${item.prize}</div>
+    <div>时间：${item.time}</div>
+  </div>`).join("");
+}
+renderLog();
+
+function clearLog(){
+  if(confirm("确定清空全部抽奖记录？")){
+    localStorage.removeItem("wheelLog");
+    renderLog();
+  }
+}
+async function copyLog(){
+  const logs = getLogs();
+  let text = "====汐辞陪玩抽奖记录====\n";
+  logs.forEach(l=>{
+    text += `【${l.time}】玩家${l.name}，抽到：${l.prize}\n`
+  })
+  try{
+    await navigator.clipboard.writeText(text);
+    alert("记录复制成功");
+  }catch(e){
+    alert("复制失败，请手动复制页面文字");
+  }
+}
+</script>
+</body>
+</html>
